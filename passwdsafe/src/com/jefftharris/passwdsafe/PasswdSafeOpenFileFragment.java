@@ -34,6 +34,7 @@ import android.widget.TextView;
 import com.jefftharris.passwdsafe.file.PasswdFileData;
 import com.jefftharris.passwdsafe.file.PasswdFileUri;
 import com.jefftharris.passwdsafe.lib.PasswdSafeUtil;
+import com.jefftharris.passwdsafe.util.Pair;
 import com.jefftharris.passwdsafe.view.GuiUtils;
 import com.jefftharris.passwdsafe.view.PasswordVisibilityMenuHandler;
 
@@ -121,12 +122,14 @@ public class PasswdSafeOpenFileFragment extends Fragment
         PasswordVisibilityMenuHandler.set(passwdView);
 
         CheckBox cb = (CheckBox)itsRoot.findViewById(R.id.read_only);
-        boolean writable = itsPasswdUri.isWritable();
-        cb.setEnabled(writable);
-        if (writable) {
+        Pair<Boolean, Integer> rc = itsPasswdUri.isWritable();
+        cb.setEnabled(rc.first);
+        if (rc.first) {
             cb.setChecked(Preferences.getFileOpenReadOnlyPref(prefs));
         } else {
             cb.setChecked(true);
+            cb.setText(String.format("%s - %s", cb.getText(),
+                                     getString(rc.second)));
         }
 
         setErrorMsg(null);

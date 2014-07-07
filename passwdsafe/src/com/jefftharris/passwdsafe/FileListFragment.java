@@ -34,12 +34,12 @@ import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.ListAdapter;
 import android.widget.ListView;
 import android.widget.SimpleAdapter;
 import android.widget.TextView;
 
 import com.jefftharris.passwdsafe.lib.PasswdSafeUtil;
+import com.jefftharris.passwdsafe.lib.Utils;
 import com.jefftharris.passwdsafe.util.FileComparator;
 import com.jefftharris.passwdsafe.view.GuiUtils;
 
@@ -101,6 +101,7 @@ public class FileListFragment extends ListFragment
 
     private static final String TITLE = "title";
     private static final String ICON = "icon";
+    private static final String MOD_DATE = "mod_date";
 
     private File itsDir;
     private LinkedList<File> itsDirHistory = new LinkedList<File>();
@@ -363,12 +364,31 @@ public class FileListFragment extends ListFragment
     /** Update files after the loader is complete */
     private final void updateFiles(List<Map<String, Object>> fileData)
     {
-        ListAdapter adapter = null;
+        SimpleAdapter adapter = null;
         if (fileData != null) {
             adapter = new SimpleAdapter(getActivity(), fileData,
                                         R.layout.file_list_item,
-                                        new String[] { TITLE, ICON },
-                                        new int[] { R.id.text, R.id.icon });
+                                        new String[] { TITLE, ICON, MOD_DATE },
+                                        new int[] { R.id.text, R.id.icon,
+                                                    R.id.mod_date });
+            adapter.setViewBinder(new SimpleAdapter.ViewBinder()
+            {
+                @Override
+                public boolean setViewValue(View view,
+                                            Object data,
+                                            String textRepresentation)
+                {
+                    if (view.getId() == R.id.mod_date) {
+                        if (data == null) {
+                            view.setVisibility(View.GONE);
+                            return true;
+                        } else {
+                            view.setVisibility(View.VISIBLE);
+                        }
+                    }
+                    return false;
+                }
+            });
         }
 
         View rootView = getView();
@@ -542,7 +562,7 @@ public class FileListFragment extends ListFragment
         /** Create an adapter map for the file */
         private final Map<String, Object> createItem(FileData file)
         {
-            HashMap<String, Object> item = new HashMap<String, Object>(2);
+            HashMap<String, Object> item = new HashMap<String, Object>(3);
             item.put(TITLE, file);
 
             int icon;
@@ -552,6 +572,8 @@ public class FileListFragment extends ListFragment
                 icon = R.drawable.folder_rev;
             } else {
                 icon = R.drawable.login_rev;
+                item.put(MOD_DATE, Utils.formatDate(file.itsFile.lastModified(),
+                                                    getContext()));
             }
             item.put(ICON, icon);
             return item;

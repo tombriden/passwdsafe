@@ -34,6 +34,7 @@
     <string name="copy_password">Copy Password</string>
     <string name="copy_user">Copy User Name</string>
     <string name="created">Created</string>
+    <string name="current">Current</string>
     <string name="custom_symbols">Custom Symbols</string>
     <string name="custom_symbol_not_alphanum">Custom symbols must not be alphanumeric or whitespace</string>
     <string name="database_policy">Database Policy - %s</string>
@@ -195,6 +196,7 @@
     <string name="record_settings">Record Settings</string>
     <string name="record_type">Record type</string>
     <string name="read_only">Read-only</string>
+    <string name="read_only_media">File is located on read-only media.  This situation can occur with Kitkat and higher on removable SD cards.</string>
     <string name="read_write">Read-write</string>
     <string name="references_label">REFERENCES</string>
     <string name="regular_expression">Regular expression</string>
@@ -239,6 +241,12 @@
     <string name="yes">Yes</string>
 
     <string name="release_notes">
+        &lt;b&gt;4.6.0&lt;/b&gt;\n
+        - Attempt to detect read-only files on SD cards with Kitkat.  Please
+        send feedback if the detection is or is not working.\n
+        - Show the current password while editing for reference\n
+        - Show modification time of local files in file list
+        \n\n
         &lt;b&gt;4.5.0&lt;/b&gt; - Add Box support with PasswdSafe Sync.  
         Password files (.psafe3) are synced from the top folder and any folder 
         tagged with \'passwdsafe\'.

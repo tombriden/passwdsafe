@@ -34,6 +34,7 @@
     <string name="copy_password">Copier le mot de passe</string>
     <string name="copy_user">Copier le nom d\'utilisateur</string>
     <string name="created">Créé</string>
+    <string name="current">Actuel</string>
     <string name="custom_symbols">Symboles personnalisés</string>
     <string name="custom_symbol_not_alphanum">Les symboles personnalisés ne doivent pas contenir d\'espaces, ni de caractères alphanumériques</string>
     <string name="database_policy">Base de données stratégie - %s</string>
@@ -195,6 +196,7 @@
     <string name="record_settings">Paramètres des entrées</string>
     <string name="record_type">Type d\'entrée</string>
     <string name="read_only">Lecture seule</string>
+    <string name="read_only_media">Le fichier se trouve sur support en lecture seule. Cette situation peut se produire avec Kitkat et plus sur des cartes SD amovibles.</string>
     <string name="read_write">Lecture-écriture</string>
     <string name="references_label">RÉFÉRENCES</string>
     <string name="regular_expression">Expression régulière</string>
@@ -239,6 +241,14 @@
     <string name="yes">Oui</string>
 
     <string name="release_notes">
+        &lt;b&gt;4.6.0&lt;/b&gt;\n
+        - Tenter de détecter fichiers en lecture seule sur des cartes SD avec 
+        Kitkat. S\'il vous plaît envoyer vos commentaires si la détection est 
+        ou ne fonctionne pas.\n
+        - Afficher le mot de passe actuel lors de l\'édition de référence\n
+        - Afficher la date de modification des fichiers locaux dans la liste 
+        des fichiers
+        \n\n
         &lt;b&gt;4.5.0&lt;/b&gt; - Ajout du support de Box avec PasswdSafe Sync.
         Fichiers par mot de passe (.psafe3) sont synchronisés dans le dossier
         haut et un dossier taggés avec \'passwdsafe\'.
