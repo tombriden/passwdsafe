@@ -8,6 +8,7 @@
 package com.jefftharris.passwdsafe;
 
 import java.io.IOException;
+import java.security.spec.KeySpec;
 import java.util.Calendar;
 import java.util.HashMap;
 import java.util.List;
@@ -26,11 +27,20 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.DialogInterface.OnClickListener;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.net.Uri;
+import android.nfc.FormatException;
+import android.nfc.NdefMessage;
+import android.nfc.NdefRecord;
+import android.nfc.NfcAdapter;
+import android.nfc.Tag;
+import android.nfc.tech.Ndef;
 import android.os.AsyncTask;
 import android.os.Bundle;
+import android.os.Parcelable;
 import android.support.annotation.NonNull;
 import android.text.TextUtils;
+import android.util.Base64;
 import android.util.Log;
 import android.view.ContextMenu;
 import android.view.ContextMenu.ContextMenuInfo;
@@ -51,10 +61,17 @@ import com.jefftharris.passwdsafe.lib.DocumentsContractCompat;
 import com.jefftharris.passwdsafe.lib.PasswdSafeUtil;
 import com.jefftharris.passwdsafe.lib.view.AbstractDialogClickListener;
 import com.jefftharris.passwdsafe.lib.view.GuiUtils;
+import com.jefftharris.passwdsafe.view.CreateNFCKeyDialog;
 import com.jefftharris.passwdsafe.view.DialogUtils;
 import com.jefftharris.passwdsafe.view.DialogValidator;
 import com.jefftharris.passwdsafe.view.PasswdEntryDialog;
 import com.jefftharris.passwdsafe.view.PasswordVisibilityMenuHandler;
+
+import javax.crypto.Cipher;
+import javax.crypto.SecretKey;
+import javax.crypto.SecretKeyFactory;
+import javax.crypto.spec.PBEKeySpec;
+import javax.crypto.spec.SecretKeySpec;
 
 public class PasswdSafe extends AbstractPasswdSafeActivity
 {
@@ -151,6 +168,37 @@ public class PasswdSafe extends AbstractPasswdSafeActivity
         }
     }
 
+    private static String encrypt(String password, byte[] salt, String plaintext) throws Exception {
+
+        SecretKeyFactory factory = SecretKeyFactory.getInstance(
+                "PBKDF2WithHmacSHA1");
+        KeySpec spec = new PBEKeySpec(password.toCharArray(), salt, 500, 256);
+        SecretKey tmp = factory.generateSecret(spec);
+        SecretKey secret = new SecretKeySpec(tmp.getEncoded(), "AES");
+
+        Cipher cipher = Cipher.getInstance("AES");
+        cipher.init(Cipher.ENCRYPT_MODE, secret);
+
+        byte[] cipherText = cipher.doFinal(plaintext.getBytes("UTF-8"));
+        return new String(Base64.encode(cipherText, 0));
+    }
+
+    private static String decrypt(String password, byte[] salt, String encrypted) throws Exception {
+
+        SecretKeyFactory factory = SecretKeyFactory.getInstance(
+                "PBKDF2WithHmacSHA1");
+        KeySpec spec = new PBEKeySpec(password.toCharArray(), salt, 500, 256);
+        SecretKey tmp = factory.generateSecret(spec);
+        SecretKey secret = new SecretKeySpec(tmp.getEncoded(), "AES");
+
+        Cipher cipher = Cipher.getInstance("AES");
+        cipher.init(Cipher.DECRYPT_MODE, secret);
+
+        byte[] cipherText = Base64.decode(encrypted.getBytes(), 0);
+        String plaintext = new String(cipher.doFinal(cipherText), "UTF-8");
+        return plaintext;
+    }
+
     @Override
     protected void onNewIntent(Intent intent)
     {
@@ -165,6 +213,82 @@ public class PasswdSafe extends AbstractPasswdSafeActivity
                 onCreateView(intent);
             } else if (itsPasswdEntryDialog != null) {
                 itsPasswdEntryDialog.onNewIntent(intent);
+            } else if(NfcAdapter.ACTION_NDEF_DISCOVERED.equals(action)) {
+                Log.i("passwdsafe", "Trying open from Nfc");
+                Tag tag = intent.getParcelableExtra(NfcAdapter.EXTRA_TAG);
+
+                boolean opened = false;
+                Parcelable[] rawMsgs = intent.getParcelableArrayExtra(NfcAdapter.EXTRA_NDEF_MESSAGES);
+                NdefMessage msg = null;
+                if (rawMsgs != null && rawMsgs.length > 0) {
+                    msg = (NdefMessage) rawMsgs[0];
+
+                    NdefRecord[] contentRecs = msg.getRecords();
+                    for (NdefRecord rec : contentRecs) {
+                        try {
+                            String id = new String(rec.getId(), "UTF-8");
+                            if(id.equals("passwdsafe")){
+                                String encryptedPass = new String(rec.getPayload(), "UTF-8");
+                                SharedPreferences sharedPref = getActivity().getPreferences(
+                                        Context.MODE_PRIVATE);
+
+                                String encryptedEncryptionPass = sharedPref
+                                        .getString("encryptionkey", "");
+                                String encryptionPass = decrypt(encryptedPass, tag.getId(), encryptedEncryptionPass);
+                                String plaintextPass = decrypt(encryptionPass, tag.getId(), encryptedPass);
+
+                                opened = true;
+                                openFile(new StringBuilder(plaintextPass),
+                                         false);
+
+                                break;
+                            }
+                        } catch (Exception e) {
+                            Log.i("passwdsafe", e.toString());
+                        }
+                    }
+                }
+                if(!opened)
+                    openFile(new StringBuilder(""), false);
+            } else if(NfcAdapter.ACTION_TAG_DISCOVERED.equals(intent.getAction())) {
+
+                Log.i("passwdsafe", "Creating nfc key");
+                Tag tag = intent.getParcelableExtra(NfcAdapter.EXTRA_TAG);
+
+                String pwsafePass = intent.getExtras().getString("pwsafe_pass");
+                String encryptionPass = intent.getExtras().getString("encryption_pass");
+
+                try{
+                    byte[] pwsafeSalt = tag.getId();
+                    byte[] encryptionSalt = tag.getId();
+
+                    String encryptedPwsafePass = encrypt(encryptionPass, pwsafeSalt, pwsafePass);
+                    String encryptedEncryptionPass = encrypt(encryptedPwsafePass, encryptionSalt, encryptionPass);
+
+                    short TNF_MIME_MEDIA = 2;
+                    NdefRecord[] records = { new NdefRecord(TNF_MIME_MEDIA, "application/nfckey".getBytes(), "passwdsafe".getBytes(), encryptedPwsafePass.getBytes()) };
+                    NdefMessage message = new NdefMessage(records);
+                    Ndef ndef = Ndef.get(tag);
+                    ndef.connect();
+                    ndef.writeNdefMessage(message);
+                    ndef.close();
+
+                    Log.i("passwdsafe", "Written to tag successfully");
+                    SharedPreferences sharedPref = getActivity().getPreferences(
+                            Context.MODE_PRIVATE);
+                    SharedPreferences.Editor editor = sharedPref.edit();
+                    editor.putString("encryptionkey", encryptedEncryptionPass);
+                    editor.commit();
+                }
+                catch(FormatException fe){
+                    Log.i("passwdsafe", fe.toString());
+                }
+                catch(IOException ioe){
+                    Log.i("passwdsafe", ioe.toString());
+                }
+                catch(Exception e){
+                    Log.i("passwdsafe", e.toString());
+                }
             }
         }
     }

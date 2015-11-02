@@ -32,6 +32,7 @@
     <string name="copy_notes">Copy Notes</string>
     <string name="copy_password">Copy Password</string>
     <string name="copy_user">Copy User Name</string>
+    <string name="create_nfc_key_title">Create NFC Key</string>
     <string name="created">Created</string>
     <string name="current">Current</string>
     <string name="custom_symbols">Custom Symbols</string>
@@ -67,6 +68,7 @@
     <string name="empty_password">Empty password</string>
     <string name="empty_title">Empty title</string>
     <string name="enabled">Enabled</string>
+    <string name="encryption_pass_title">Encryption Password</string>
     <string name="enter_net_group">Enter new group:</string>
     <string name="erase_all_expiration_notifications">Erase all password expiration notifications and tracked files</string>
     <string name="expiration">Expiration</string>
@@ -200,6 +202,7 @@
     <string name="protected_record">Protected</string>
     <string name="protected_record_header">PROTECTED RECORD</string>
     <string name="psafe3_ext">.psafe3</string>
+    <string name="pwsafe_pass_title">PassSafe Password</string>
     <string name="query_label">Search: %1$s</string>
     <string name="recent_files">Recent Files</string>
     <string name="record">Record</string>

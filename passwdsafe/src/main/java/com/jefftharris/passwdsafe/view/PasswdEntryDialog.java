@@ -11,11 +11,15 @@ import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.Dialog;
+import android.app.PendingIntent;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.SharedPreferences;
+import android.nfc.NfcAdapter;
 import android.os.Build;
 import android.preference.PreferenceManager;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.Button;
@@ -68,6 +72,20 @@ public class PasswdEntryDialog implements View.OnClickListener
             itsYubiMgr = new YubikeyMgr();
             itsYubiUser = new YubikeyUser();
         }
+
+        PendingIntent pendingIntent = PendingIntent.getActivity(itsActivity, 0, new Intent(itsActivity, itsActivity.getClass()).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP), 0);
+        IntentFilter tagDetected = new IntentFilter(NfcAdapter.ACTION_NDEF_DISCOVERED);
+        tagDetected.addCategory(Intent.CATEGORY_DEFAULT);
+        try{
+            tagDetected.addDataType("application/nfckey");
+            IntentFilter filters[] = new IntentFilter[] { tagDetected };
+            Log.i("passwdsafe", "foreground dispatch");
+            NfcAdapter.getDefaultAdapter(itsActivity).enableForegroundDispatch(itsActivity, pendingIntent, filters, null);
+        }
+        catch (  IntentFilter.MalformedMimeTypeException e) {
+            Log.i("passwdsafe", "invalid mime");
+        }
+
     }
 
     /** Create the dialog */
@@ -188,7 +206,7 @@ public class PasswdEntryDialog implements View.OnClickListener
             }
         }
     }
-
+    
     /** Handle a pause of the activity.  Return true if the manager is active;
      *  false otherwise */
     public boolean onPause()
@@ -196,7 +214,7 @@ public class PasswdEntryDialog implements View.OnClickListener
         return (itsYubiMgr != null) && itsYubiMgr.onPause();
     }
 
-    /** Handle a new intent.  Return true if handled */
+    /** Handle a new intent */
     public void onNewIntent(Intent intent)
     {
         if (itsYubiMgr != null) {
