@@ -229,9 +229,13 @@ public class PasswdEntryDialog implements View.OnClickListener
         if (view.getId() == R.id.yubi_start) {
             itsYubiMgr.start(itsYubiUser);
         } else if (view.getId() == R.id.yubi_help) {
-            View help = itsDialog.findViewById(R.id.yubi_help_text);
-            help.setVisibility((help.getVisibility() == View.VISIBLE) ?
-                                View.GONE : View.VISIBLE);
+            //View help = itsDialog.findViewById(R.id.yubi_help_text);
+            //help.setVisibility((help.getVisibility() == View.VISIBLE) ?
+            //                    View.GONE : View.VISIBLE);
+            CreateNFCKeyDialog d = new CreateNFCKeyDialog(this.itsActivity);
+            Dialog dialog = d.create();
+            dialog.show();
+
         }
     }
 
