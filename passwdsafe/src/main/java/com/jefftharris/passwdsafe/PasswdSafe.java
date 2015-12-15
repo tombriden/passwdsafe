@@ -35,6 +35,7 @@ import android.nfc.NdefRecord;
 import android.nfc.NfcAdapter;
 import android.nfc.Tag;
 import android.nfc.tech.Ndef;
+import android.nfc.tech.NdefFormatable;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Parcelable;
@@ -269,10 +270,20 @@ public class PasswdSafe extends AbstractPasswdSafeActivity
                     NdefRecord[] records = { new NdefRecord(TNF_MIME_MEDIA, "application/nfckey".getBytes(), "passwdsafe".getBytes(), encryptedPwsafePass.getBytes()) };
                     NdefMessage message = new NdefMessage(records);
                     Ndef ndef = Ndef.get(tag);
-                    ndef.connect();
-                    ndef.writeNdefMessage(message);
-                    ndef.close();
 
+                    if(ndef != null) {
+                        ndef.connect();
+                        ndef.writeNdefMessage(message);
+                        ndef.close();
+                    }
+                    else{
+                        NdefFormatable formatable = NdefFormatable.get(tag);
+                        if (formatable != null) {
+                            formatable.connect();
+                            formatable.format(message);
+                            formatable.close();
+                        }
+                    }
                     Log.i("passwdsafe", "Written to tag successfully");
                     SharedPreferences sharedPref = getActivity().getPreferences(
                             Context.MODE_PRIVATE);
