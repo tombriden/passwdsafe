@@ -8,9 +8,9 @@
 package com.jefftharris.passwdsafe.util;
 
 /**
- * State of YubiKey support
+ * State of Nfc support
  */
-public enum YubiState
+public enum NfcState
 {
     UNAVAILABLE,
     DISABLED,

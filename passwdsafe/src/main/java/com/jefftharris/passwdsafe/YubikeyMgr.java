@@ -8,31 +8,45 @@
 package com.jefftharris.passwdsafe;
 
 import java.io.ByteArrayOutputStream;
+import java.security.spec.KeySpec;
 
 import org.pwsafe.lib.Util;
 
 import android.annotation.TargetApi;
 import android.app.Activity;
 import android.app.PendingIntent;
+import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.SharedPreferences;
+import android.nfc.NdefMessage;
+import android.nfc.NdefRecord;
 import android.nfc.NfcAdapter;
 import android.nfc.Tag;
 import android.nfc.tech.IsoDep;
+import android.nfc.tech.Ndef;
 import android.os.Build;
 import android.os.CountDownTimer;
+import android.os.Parcelable;
+import android.util.Base64;
 import android.widget.Toast;
 
 import com.jefftharris.passwdsafe.lib.PasswdSafeUtil;
 import com.jefftharris.passwdsafe.lib.Utils;
-import com.jefftharris.passwdsafe.util.YubiState;
+import com.jefftharris.passwdsafe.util.NfcState;
+
+import javax.crypto.Cipher;
+import javax.crypto.SecretKey;
+import javax.crypto.SecretKeyFactory;
+import javax.crypto.spec.PBEKeySpec;
+import javax.crypto.spec.SecretKeySpec;
 
 
 /**
  * The YubikeyMgr class encapsulates the interaction with a YubiKey
  */
 @TargetApi(Build.VERSION_CODES.GINGERBREAD_MR1)
-public class YubikeyMgr
+public class YubikeyMgr extends NfcMgr
 {
     /// Command to select the app running on the key
     private static final byte[] SELECT_CMD =
@@ -47,127 +61,15 @@ public class YubikeyMgr
     private static final int SHA1_MAX_BLOCK_SIZE = 64;
 
     private static final String TAG = "YubikeyMgr";
-
     private User itsUser = null;
-    private boolean itsIsRegistered = false;
-    private PendingIntent itsTagIntent = null;
-    private CountDownTimer itsTimer = null;
 
-    /// Interface for a user of the YubikeyMgr
-    public interface User
+    public interface User extends NfcMgr.User
     {
-        /// Get the activity using the key
-        Activity getActivity();
-
         /// Get the password to be sent to the key
         String getUserPassword();
 
         /// Get the slot number to use on the key
         int getSlotNum();
-
-        /// Finish interaction with the key
-        void finish(String password, Exception e);
-
-        /// Handle an update on the timer until the start times out
-        void timerTick(@SuppressWarnings("SameParameterValue") int totalTime,
-                       int remainingTime);
-    }
-
-    /** Get the state of support for the Yubikey */
-    public YubiState getState(Activity act)
-    {
-        NfcAdapter adapter = NfcAdapter.getDefaultAdapter(act);
-        if (adapter == null) {
-            return YubiState.UNAVAILABLE;
-        } else if (!adapter.isEnabled()) {
-            return YubiState.DISABLED;
-        }
-        return YubiState.ENABLED;
-    }
-
-    /// Start the interaction with the YubiKey
-    public void start(User user)
-    {
-        if (itsUser != null) {
-            stop();
-        }
-
-        itsUser = user;
-        Activity act = itsUser.getActivity();
-        if (itsTagIntent == null) {
-            Intent intent = new Intent(act, act.getClass());
-            intent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
-            itsTagIntent = PendingIntent.getActivity(act, 0, intent, 0);
-        }
-
-        if (!itsIsRegistered) {
-            NfcAdapter adapter = NfcAdapter.getDefaultAdapter(act);
-            if (adapter == null) {
-                Toast.makeText(act, "NO NFC", Toast.LENGTH_LONG).show();
-                return;
-            }
-
-            if (!adapter.isEnabled()) {
-                Toast.makeText(act, "NFC DISABLED", Toast.LENGTH_LONG).show();
-                return;
-            }
-
-            IntentFilter iso =
-                    new IntentFilter(NfcAdapter.ACTION_TECH_DISCOVERED);
-            adapter.enableForegroundDispatch(
-                    act, itsTagIntent, new IntentFilter[] { iso },
-                    new String[][]
-                            { new String[] { IsoDep.class.getName() } });
-            itsIsRegistered = true;
-        }
-
-        itsTimer = new CountDownTimer(30 * 1000, 1 * 1000) {
-            @Override
-            public void onFinish()
-            {
-                stop();
-            }
-
-            @Override
-            public void onTick(long millisUntilFinished)
-            {
-                itsUser.timerTick(30, (int)(millisUntilFinished / 1000));
-            }
-        };
-        itsTimer.start();
-    }
-
-    /** Handle a pause of the activity */
-    public void onPause()
-    {
-        if (itsUser == null) {
-            return;
-        }
-        Activity act = itsUser.getActivity();
-
-        if (itsIsRegistered) {
-            NfcAdapter adapter = NfcAdapter.getDefaultAdapter(act);
-            if ((adapter == null) || !adapter.isEnabled()) {
-                return;
-            }
-
-            adapter.disableForegroundDispatch(act);
-            itsIsRegistered = false;
-        }
-
-        if (itsTagIntent != null) {
-            itsTagIntent.cancel();
-            itsTagIntent = null;
-        }
-    }
-
-    /// Stop the interaction with the key
-    public void stop()
-    {
-        onPause();
-        stopUser(null, null);
-        itsTimer = null;
-        itsUser = null;
     }
 
     /// Handle the intent for when the key is discovered
@@ -183,8 +85,8 @@ public class YubikeyMgr
             return;
         }
 
-        IsoDep isotag = IsoDep.get(tag);
         try {
+            IsoDep isotag = IsoDep.get(tag);
             isotag.connect();
             try {
                 byte[] resp = isotag.transceive(SELECT_CMD);
@@ -206,8 +108,8 @@ public class YubikeyMgr
                     // Chars are encoded as little-endian UTF-16.  A trailing
                     // zero must be skipped as the PC API will skip it.
                     datalen = 0;
-                    for (int i = 0; i < pwlen - 1; ++i) {
-                        datalen += 2;
+                    for (int i = 0; i < pwlen - 1; i++) {
+                        datalen = 2;
                         char c = pw.charAt(i);
                         cmd.write(c & 0xff);
                         cmd.write((c >> 8) & 0xff);
@@ -227,32 +129,32 @@ public class YubikeyMgr
                     cmd.write(0);
                 }
 
-                byte[] cmdbytes = cmd.toByteArray();
+                byte[] cmdBytes = cmd.toByteArray();
                 int slot = itsUser.getSlotNum();
                 if (slot == 1) {
-                    cmdbytes[2] = SLOT_CHAL_HMAC1;
+                    cmdBytes[2] = SLOT_CHAL_HMAC1;
                 } else {
-                    cmdbytes[2] = SLOT_CHAL_HMAC2;
+                    cmdBytes[2] = SLOT_CHAL_HMAC2;
                 }
-                cmdbytes[HASH_CMD.length] = datalen;
-//                PasswdSafeUtil.dbginfo(TAG, "cmd: %s",
-//                                       Util.bytesToHex(cmdbytes));
+                cmdBytes[HASH_CMD.length] = datalen;
+                //                PasswdSafeUtil.dbginfo(TAG, "cmd: %s",
+                //                                       Util.bytesToHex(cmdbytes));
 
-                resp = isotag.transceive(cmdbytes);
+                resp = isotag.transceive(cmdBytes);
                 checkResponse(resp);
 
                 // Prune response bytes and convert
                 String pwstr = Util.bytesToHex(resp, 0, resp.length - 2);
-//                PasswdSafeUtil.dbginfo(TAG, "Pw: " + pwstr);
+                //                PasswdSafeUtil.dbginfo(TAG, "Pw: " + pwstr);
                 stopUser(pwstr, null);
+
             } finally {
                 Utils.closeStreams(isotag);
             }
-        } catch (Exception e) {
+        }catch(Exception e){
             PasswdSafeUtil.dbginfo(TAG, e, "handleKeyIntent");
             stopUser(null, e);
         }
-
     }
 
     /// Check for a valid response
@@ -268,16 +170,4 @@ public class YubikeyMgr
                             Util.bytesToHex(resp));
     }
 
-    /**
-     * Stop interaction with the user
-     */
-    private void stopUser(String password, Exception e)
-    {
-        if (itsTimer != null) {
-            itsTimer.cancel();
-        }
-        if (itsUser != null) {
-            itsUser.finish(password, e);
-        }
-    }
 }

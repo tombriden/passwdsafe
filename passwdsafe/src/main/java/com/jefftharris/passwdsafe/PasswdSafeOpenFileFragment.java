@@ -40,7 +40,7 @@ import com.jefftharris.passwdsafe.lib.PasswdSafeUtil;
 import com.jefftharris.passwdsafe.lib.view.GuiUtils;
 import com.jefftharris.passwdsafe.lib.view.TypefaceUtils;
 import com.jefftharris.passwdsafe.util.Pair;
-import com.jefftharris.passwdsafe.util.YubiState;
+import com.jefftharris.passwdsafe.util.NfcState;
 import com.jefftharris.passwdsafe.view.ConfirmPromptDialog;
 import com.jefftharris.passwdsafe.view.TextInputUtils;
 
@@ -127,7 +127,7 @@ public class PasswdSafeOpenFileFragment
     private AddSavedPasswordUser itsAddSavedPasswordUser;
     private YubikeyMgr itsYubiMgr;
     private YubikeyMgr.User itsYubiUser;
-    private YubiState itsYubiState = YubiState.UNAVAILABLE;
+    private NfcState itsYubiState = NfcState.UNAVAILABLE;
     private int itsYubiSlot = 2;
     private boolean itsIsYubikey = false;
     private String itsUserPassword;
@@ -895,15 +895,31 @@ public class PasswdSafeOpenFileFragment
     }
 
     /**
-     * User of the YubikeyMgr
+     * User of the NfcMgr
      */
-    private class YubikeyUser implements YubikeyMgr.User
-    {
+    private class NfcUser implements NfcMgr.User {
         @Override
-        public Activity getActivity()
-        {
+        public Activity getActivity() {
             return PasswdSafeOpenFileFragment.this.getActivity();
         }
+
+        @Override
+        public void timerTick(int totalTime, int remainingTime)
+        {
+            ProgressBar progress = getProgress();
+            progress.setMax(totalTime);
+            progress.setProgress(remainingTime);
+        }
+
+        @Override
+        public void finish(String password, Exception e) {
+        }
+    }
+
+    /**
+     * User of the YubikeyMgr
+     */
+    private class YubikeyUser extends NfcUser implements YubikeyMgr.User {
 
         @Override
         public String getUserPassword()
@@ -912,8 +928,7 @@ public class PasswdSafeOpenFileFragment
         }
 
         @Override
-        public void finish(String password, Exception e)
-        {
+        public void finish(String password, Exception e) {
             boolean haveUser = (itsYubiUser != null);
             itsYubiUser = null;
             if (password != null) {
@@ -933,14 +948,6 @@ public class PasswdSafeOpenFileFragment
         public int getSlotNum()
         {
             return itsYubiSlot;
-        }
-
-        @Override
-        public void timerTick(int totalTime, int remainingTime)
-        {
-            ProgressBar progress = getProgress();
-            progress.setMax(totalTime);
-            progress.setProgress(remainingTime);
         }
     }
 
