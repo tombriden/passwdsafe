@@ -56,6 +56,9 @@ public class Preferences
         "fileOpenReadOnly";
     private static final boolean PREF_FILE_OPEN_READ_ONLY_DEF = false;
 
+    private static final String PREF_FILE_OPEN_NFCTAG = "fileOpenNfcTag";
+    private static final boolean PREF_FILE_OPEN_NFCTAG_DEF = false;
+
     private static final String PREF_FILE_OPEN_YUBIKEY = "fileOpenYubikey";
     private static final boolean PREF_FILE_OPEN_YUBIKEY_DEF = false;
 
@@ -193,6 +196,24 @@ public class Preferences
         SharedPreferences.Editor prefsEdit = prefs.edit();
         prefsEdit.putBoolean(PREF_FILE_OPEN_READ_ONLY, readonly);
         prefsEdit.apply();
+    }
+
+    /**
+     * Get the preference to use NfcTag
+     */
+    public static boolean getFileOpenNfcTagPref(SharedPreferences prefs)
+    {
+        return prefs.getBoolean(PREF_FILE_OPEN_NFCTAG,
+                PREF_FILE_OPEN_NFCTAG_DEF);
+    }
+
+    /**
+     * Set the preference to use YubiKey
+     */
+    public static void setFileOpenNfcTagPref(boolean nfctag,
+                                              SharedPreferences prefs)
+    {
+        prefs.edit().putBoolean(PREF_FILE_OPEN_NFCTAG, nfctag).apply();
     }
 
     /**

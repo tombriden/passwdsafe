@@ -84,6 +84,13 @@
                   android:drawableStart="@drawable/yubikey"
                   android:text="@string/yubikey"/>
 
+        <CheckBox android:id="@+id/nfctag"
+                  android:layout_width="0dp"
+                  android:layout_gravity="center_vertical"
+                  android:layout_height="wrap_content"
+                  android:layout_weight="1"
+                  android:text="@string/nfctag"/>
+
         <TextView android:id="@+id/saved_password"
                   android:layout_width="match_parent"
                   android:layout_height="wrap_content"
@@ -104,12 +111,11 @@
                       android:layout_height="wrap_content"
                       android:orientation="horizontal">
 
-            <TextView android:id="@+id/yubi_progress_text"
+            <TextView android:id="@+id/nfc_progress_text"
                       android:layout_width="wrap_content"
                       android:layout_height="wrap_content"
                       android:layout_marginEnd="6dp"
                       android:layout_marginRight="6dp"
-                      android:text="@string/press_yubikey"
                       android:textAppearance="?android:attr/textAppearanceMedium"/>
 
             <ProgressBar android:id="@+id/progress"

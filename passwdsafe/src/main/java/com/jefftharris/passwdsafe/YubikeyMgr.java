@@ -8,38 +8,18 @@
 package com.jefftharris.passwdsafe;
 
 import java.io.ByteArrayOutputStream;
-import java.security.spec.KeySpec;
 
 import org.pwsafe.lib.Util;
 
 import android.annotation.TargetApi;
-import android.app.Activity;
-import android.app.PendingIntent;
-import android.content.Context;
 import android.content.Intent;
-import android.content.IntentFilter;
-import android.content.SharedPreferences;
-import android.nfc.NdefMessage;
-import android.nfc.NdefRecord;
 import android.nfc.NfcAdapter;
 import android.nfc.Tag;
 import android.nfc.tech.IsoDep;
-import android.nfc.tech.Ndef;
 import android.os.Build;
-import android.os.CountDownTimer;
-import android.os.Parcelable;
-import android.util.Base64;
-import android.widget.Toast;
 
 import com.jefftharris.passwdsafe.lib.PasswdSafeUtil;
 import com.jefftharris.passwdsafe.lib.Utils;
-import com.jefftharris.passwdsafe.util.NfcState;
-
-import javax.crypto.Cipher;
-import javax.crypto.SecretKey;
-import javax.crypto.SecretKeyFactory;
-import javax.crypto.spec.PBEKeySpec;
-import javax.crypto.spec.SecretKeySpec;
 
 
 /**
@@ -73,6 +53,7 @@ public class YubikeyMgr extends NfcMgr
     }
 
     /// Handle the intent for when the key is discovered
+    @Override
     public void handleKeyIntent(Intent intent)
     {
         if (!NfcAdapter.ACTION_TECH_DISCOVERED.equals(intent.getAction())) {

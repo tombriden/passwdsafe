@@ -92,6 +92,7 @@ public class PasswdSafeOpenFileFragment
         INITIAL,
         RESOLVING,
         WAITING_PASSWORD,
+        NFCTAG,
         YUBIKEY,
         OPENING,
         SAVING_PASSWORD,
@@ -112,6 +113,7 @@ public class PasswdSafeOpenFileFragment
     private String itsRecToOpen;
     private TextView itsTitle;
     private TextInputLayout itsPasswordInput;
+    private TextView itsNfcProgress;
     private TextView itsPasswordEdit;
     private TextView itsSavedPasswordMsg;
     private int itsSavedPasswordTextColor;
@@ -119,15 +121,18 @@ public class PasswdSafeOpenFileFragment
     private TextView itsReadonlyMsg;
     private CheckBox itsSavePasswdCb;
     private CheckBox itsYubikeyCb;
+    private CheckBox itsNfcTagCb;
     private Button itsOkBtn;
     private OpenTask itsOpenTask;
     private SavedPasswordsMgr itsSavedPasswordsMgr;
     private SavePasswordChange itsSaveChange = SavePasswordChange.NONE;
     private LoadSavedPasswordUser itsLoadSavedPasswordUser;
     private AddSavedPasswordUser itsAddSavedPasswordUser;
+    private NfcMgr itsNfcMgr;
+    private NfcMgr.User itsNfcUser;
     private YubikeyMgr itsYubiMgr;
     private YubikeyMgr.User itsYubiUser;
-    private NfcState itsYubiState = NfcState.UNAVAILABLE;
+    private NfcState itsNfcState = NfcState.UNAVAILABLE;
     private int itsYubiSlot = 2;
     private boolean itsIsYubikey = false;
     private String itsUserPassword;
@@ -209,16 +214,26 @@ public class PasswdSafeOpenFileFragment
         GuiUtils.setVisible(itsSavePasswdCb, saveAvailable);
         GuiUtils.setVisible(itsSavedPasswordMsg, false);
 
+        itsNfcProgress = (TextView)rootView.findViewById(R.id.nfc_progress_text);
+        itsNfcMgr = new NfcMgr();
+        itsNfcTagCb = (CheckBox)rootView.findViewById(R.id.nfctag);
+        itsNfcTagCb.setOnCheckedChangeListener(this);
+
         itsYubiMgr = new YubikeyMgr();
         itsYubikeyCb = (CheckBox)rootView.findViewById(R.id.yubikey);
+        itsYubikeyCb.setOnCheckedChangeListener(this);
+
         setVisibility(R.id.file_open_help_text, false, rootView);
-        itsYubiState = itsYubiMgr.getState(getActivity());
-        switch (itsYubiState) {
+        itsNfcState = itsNfcMgr.getState(getActivity());
+        switch (itsNfcState) {
         case UNAVAILABLE: {
+            GuiUtils.setVisible(itsNfcTagCb, false);
             GuiUtils.setVisible(itsYubikeyCb, false);
             break;
         }
         case DISABLED: {
+            itsNfcTagCb.setEnabled(false);
+            itsNfcTagCb.setText(R.string.nfctag_disabled);
             itsYubikeyCb.setEnabled(false);
             itsYubikeyCb.setText(R.string.yubikey_disabled);
             break;
@@ -227,7 +242,7 @@ public class PasswdSafeOpenFileFragment
             break;
         }
         }
-        setVisibility(R.id.yubi_progress_text, false, rootView);
+        setVisibility(R.id.nfc_progress_text, false, rootView);
 
         return rootView;
     }
@@ -265,6 +280,9 @@ public class PasswdSafeOpenFileFragment
     public void onPause()
     {
         super.onPause();
+        if (itsNfcMgr != null) {
+            itsNfcMgr.onPause();
+        }
         if (itsYubiMgr != null) {
             itsYubiMgr.onPause();
         }
@@ -275,6 +293,9 @@ public class PasswdSafeOpenFileFragment
     public void onStop()
     {
         super.onStop();
+        if (itsNfcMgr != null) {
+            itsNfcMgr.stop();
+        }
         if (itsYubiMgr != null) {
             itsYubiMgr.stop();
         }
@@ -292,7 +313,10 @@ public class PasswdSafeOpenFileFragment
     /** Handle a new intent */
     public void onNewIntent(Intent intent)
     {
-        if (itsYubiMgr != null) {
+        if (itsNfcTagCb.isChecked() && itsNfcMgr != null) {
+            itsNfcMgr.handleKeyIntent(intent);
+        }
+        else if (itsYubikeyCb.isChecked() && itsYubiMgr != null) {
             itsYubiMgr.handleKeyIntent(intent);
         }
     }
@@ -303,7 +327,7 @@ public class PasswdSafeOpenFileFragment
         if ((itsListener != null) && itsListener.isNavDrawerClosed()) {
             inflater.inflate(R.menu.fragment_passwdsafe_open_file, menu);
 
-            switch (itsYubiState) {
+            switch (itsNfcState) {
             case ENABLED:
             case DISABLED: {
                 break;
@@ -377,7 +401,9 @@ public class PasswdSafeOpenFileFragment
         case R.id.ok: {
             if (itsYubikeyCb.isChecked()) {
                 setPhase(Phase.YUBIKEY);
-            } else {
+            } else if (itsNfcTagCb.isChecked()) {
+                setPhase(Phase.NFCTAG);
+            }else {
                 setPhase(Phase.OPENING);
             }
             break;
@@ -389,6 +415,14 @@ public class PasswdSafeOpenFileFragment
     public void onCheckedChanged(CompoundButton button, boolean isChecked)
     {
         switch (button.getId()) {
+        case R.id.nfctag: {
+            if(itsNfcTagCb.isChecked())
+                itsYubikeyCb.setChecked(false);
+        }
+        case R.id.yubikey: {
+            if(itsYubikeyCb.isChecked())
+                itsNfcTagCb.setChecked(false);
+        }
         case R.id.save_password: {
             if (itsSavePasswdCb.isChecked()) {
                 Context ctx = getContext();
@@ -479,13 +513,15 @@ public class PasswdSafeOpenFileFragment
         itsReadonlyCb.setEnabled(readonlyEnabled);
         itsSavePasswdCb.setEnabled(savePasswdEnabled);
 
-        switch (itsYubiState) {
+        switch (itsNfcState) {
         case ENABLED: {
             itsYubikeyCb.setEnabled(enabled);
+            itsNfcTagCb.setEnabled(enabled);
             break;
         }
         case DISABLED: {
             itsYubikeyCb.setEnabled(false);
+            itsNfcTagCb.setEnabled(false);
             break;
         }
         case UNAVAILABLE: {
@@ -515,9 +551,17 @@ public class PasswdSafeOpenFileFragment
             cancelSavedPasswordUsers();
             break;
         }
+        case NFCTAG:{
+            View root = getView();
+            setVisibility(R.id.nfc_progress_text, false, root);
+            setProgressVisible(false, false);
+            setFieldsDisabled(true);
+            itsNfcMgr.stop();
+            break;
+        }
         case YUBIKEY: {
             View root = getView();
-            setVisibility(R.id.yubi_progress_text, false, root);
+            setVisibility(R.id.nfc_progress_text, false, root);
             setProgressVisible(false, false);
             setFieldsDisabled(true);
             itsYubiMgr.stop();
@@ -543,11 +587,22 @@ public class PasswdSafeOpenFileFragment
             enterWaitingPasswordPhase();
             break;
         }
+        case NFCTAG: {
+            itsNfcUser = new NfcUser();
+            itsNfcMgr.start(itsNfcUser);
+            View root = getView();
+            itsNfcProgress.setText(R.string.press_nfctag);
+            setVisibility(R.id.nfc_progress_text, true, root);
+            setProgressVisible(true, false);
+            setFieldsDisabled(false);
+            break;
+        }
         case YUBIKEY: {
             itsYubiUser = new YubikeyUser();
             itsYubiMgr.start(itsYubiUser);
             View root = getView();
-            setVisibility(R.id.yubi_progress_text, true, root);
+            itsNfcProgress.setText(R.string.press_yubikey);
+            setVisibility(R.id.nfc_progress_text, true, root);
             setProgressVisible(true, false);
             setFieldsDisabled(false);
             break;
@@ -595,17 +650,8 @@ public class PasswdSafeOpenFileFragment
             }
         }
 
-        switch (itsYubiState) {
-        case ENABLED: {
-            itsYubikeyCb.setChecked(Preferences.getFileOpenYubikeyPref(prefs));
-            break;
-        }
-        case DISABLED:
-        case UNAVAILABLE: {
-            itsYubikeyCb.setChecked(false);
-            break;
-        }
-        }
+        itsNfcTagCb.setChecked(Preferences.getFileOpenNfcTagPref(prefs));
+        itsYubikeyCb.setChecked(Preferences.getFileOpenYubikeyPref(prefs));
     }
 
     /**
@@ -653,6 +699,7 @@ public class PasswdSafeOpenFileFragment
         boolean readonly = itsReadonlyCb.isChecked();
         SharedPreferences prefs = Preferences.getSharedPrefs(getContext());
         Preferences.setFileOpenReadOnlyPref(readonly, prefs);
+        Preferences.setFileOpenNfcTagPref(itsNfcTagCb.isChecked(), prefs);
         Preferences.setFileOpenYubikeyPref(itsYubikeyCb.isChecked(), prefs);
 
         boolean isSaved = itsSavedPasswordsMgr.isSaved(getFileUri());
@@ -913,6 +960,18 @@ public class PasswdSafeOpenFileFragment
 
         @Override
         public void finish(String password, Exception e) {
+            boolean haveUser = (itsNfcUser != null);
+            itsNfcUser = null;
+            if (password != null) {
+                itsPasswordEdit.setText(password);
+                setPhase(Phase.OPENING);
+            } else if (e != null) {
+                Activity act = getActivity();
+                PasswdSafeUtil.showFatalMsg(
+                        e, act.getString(R.string.nfctag_error), act);
+            } else if (haveUser) {
+                setPhase(Phase.WAITING_PASSWORD);
+            }
         }
     }
 

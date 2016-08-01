@@ -200,6 +200,9 @@
     <string name="new_owncloud_file">New ownCloud File</string>
     <string name="new_policy">New Policy</string>
     <string name="next">Next</string>
+    <string name="nfctag">NFC Tag</string>
+    <string name="nfctag_disabled">NFC Unlock disabled. Enable NFC to use.</string>
+    <string name="nfctag_error">Error communicating with the NFC Tag</string>
     <string name="no_alias_chosen">No alias chosen</string>
     <string name="no_file_permission">
         PasswdSafe requires file permissions.
@@ -267,6 +270,7 @@
     <string name="policy_yes_sym_pronounce" tools:ignore="StringFormatCount">Yes - Symbols: %2$s</string>
     <string name="press_again_close_warning">Press again to close the file</string>
     <string name="press_password_warning">Press Password again to paste into visible field</string>
+    <string name="press_nfctag">Press NFC Tag</string>
     <string name="press_yubikey">Press YubiKey</string>
     <string name="protect_all">Protect All Records</string>
     <string name="protect_group">Protect Group Records</string>

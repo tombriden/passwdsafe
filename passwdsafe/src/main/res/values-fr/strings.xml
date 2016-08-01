@@ -205,6 +205,9 @@
     <string name="new_owncloud_file">Nouveau fichier ownCloud</string>
     <string name="new_policy">Nouvelle stratégie</string>
     <string name="next">Suivant</string>
+    <string name="nfctag">NFC Tag</string>
+    <string name="nfctag_disabled">NFC Tag désactivée. Activer NFC pour utiliser.</string>
+    <string name="nfctag_error">Erreur de communication avec le NFC Tag</string>
     <string name="no_alias_chosen">Aucun alias choisi</string>
     <string name="no_file_permission">
         PasswdSafe a besoin des droits sur le fichier.
@@ -274,6 +277,7 @@
     <string name="policy_yes_sym_pronounce">Oui - Au moins %1$d des symboles prononçables: %2$s</string>
     <string name="press_again_close_warning">Appuyez à nouveau pour fermer le fichier</string>
     <string name="press_password_warning">Appuyez de nouveau Mot de passe pour coller dans le champ visible</string>
+    <string name="press_nfctag">Appyuez sur la NFC Tag</string>
     <string name="press_yubikey">Appyuez sur la YubiKey</string>
     <string name="protect_all">Protéger toutes les entrées</string>
     <string name="protect_group">Protéger un groupe d\'entrées</string>

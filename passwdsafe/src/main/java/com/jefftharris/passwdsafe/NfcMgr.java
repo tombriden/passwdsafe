@@ -49,7 +49,7 @@ public class NfcMgr
 {
     private static final String TAG = "NfcMgr";
 
-    protected User itsUser = null;
+    private User itsUser = null;
     private boolean itsIsRegistered = false;
     private PendingIntent itsTagIntent = null;
     private CountDownTimer itsTimer = null;
@@ -77,6 +77,22 @@ public class NfcMgr
             return NfcState.DISABLED;
         }
         return NfcState.ENABLED;
+    }
+
+    private static String decrypt(String password, byte[] salt, String encrypted) throws Exception {
+
+        SecretKeyFactory factory = SecretKeyFactory.getInstance(
+                "PBKDF2WithHmacSHA1");
+        KeySpec spec = new PBEKeySpec(password.toCharArray(), salt, 500, 256);
+        SecretKey tmp = factory.generateSecret(spec);
+        SecretKey secret = new SecretKeySpec(tmp.getEncoded(), "AES");
+
+        Cipher cipher = Cipher.getInstance("AES");
+        cipher.init(Cipher.DECRYPT_MODE, secret);
+
+        byte[] cipherText = Base64.decode(encrypted.getBytes(), 0);
+        String plaintext = new String(cipher.doFinal(cipherText), "UTF-8");
+        return plaintext;
     }
 
     /// Start the interaction with the NfcTag
@@ -162,6 +178,57 @@ public class NfcMgr
         stopUser(null, null);
         itsTimer = null;
         itsUser = null;
+    }
+
+    /// Handle the intent for when the key is discovered
+    public void handleKeyIntent(Intent intent)
+    {
+        if (!NfcAdapter.ACTION_TECH_DISCOVERED.equals(intent.getAction())) {
+            return;
+        }
+
+        PasswdSafeUtil.dbginfo(TAG, "calculate");
+        Tag tag = intent.getParcelableExtra(NfcAdapter.EXTRA_TAG);
+        if ((tag == null) || (itsUser == null)) {
+            return;
+        }
+
+        try {
+            PasswdSafeUtil.dbginfo(TAG, "Not a yubikey");
+            Parcelable[] rawMsgs = intent.getParcelableArrayExtra(
+                    NfcAdapter.EXTRA_NDEF_MESSAGES);
+            NdefMessage msg;
+            if (rawMsgs != null && rawMsgs.length > 0) {
+                msg = (NdefMessage)rawMsgs[0];
+
+                NdefRecord[] contentRecs = msg.getRecords();
+                for (NdefRecord rec : contentRecs) {
+                    String id = new String(rec.getId(), "UTF-8");
+                    if (id.equals("passwdsafe")) {
+                        String encryptedPass = new String(
+                                rec.getPayload(), "UTF-8");
+                        SharedPreferences sharedPref = itsUser
+                                .getActivity().getPreferences(
+                                        Context.MODE_PRIVATE);
+
+                        String encryptedEncryptionPass = sharedPref
+                                .getString("encryptionkey", "");
+                        String encryptionPass = decrypt(
+                                encryptedPass, tag.getId(),
+                                encryptedEncryptionPass);
+                        String pwstr = decrypt(
+                                encryptionPass, tag.getId(),
+                                encryptedPass);
+
+                        stopUser(pwstr, null);
+                        break;
+                    }
+                }
+            }
+        }catch(Exception e){
+            PasswdSafeUtil.dbginfo(TAG, e, "handleKeyIntent");
+            stopUser(null, e);
+        }
     }
 
     /**
