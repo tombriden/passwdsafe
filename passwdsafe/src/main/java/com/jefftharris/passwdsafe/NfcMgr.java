@@ -20,6 +20,7 @@ import android.nfc.NfcAdapter;
 import android.nfc.Tag;
 import android.nfc.tech.IsoDep;
 import android.nfc.tech.Ndef;
+import android.nfc.tech.NdefFormatable;
 import android.os.Build;
 import android.os.CountDownTimer;
 import android.os.Parcelable;
@@ -33,6 +34,7 @@ import org.pwsafe.lib.Util;
 
 import java.io.ByteArrayOutputStream;
 import java.security.spec.KeySpec;
+import java.util.UUID;
 
 import javax.crypto.Cipher;
 import javax.crypto.SecretKey;
@@ -77,6 +79,20 @@ public class NfcMgr
             return NfcState.DISABLED;
         }
         return NfcState.ENABLED;
+    }
+
+    private static String encrypt(String password, byte[] salt, String plaintext) throws Exception {
+
+        SecretKeyFactory factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA1");
+        KeySpec spec = new PBEKeySpec(password.toCharArray(), salt, 500, 256);
+        SecretKey tmp = factory.generateSecret(spec);
+        SecretKey secret = new SecretKeySpec(tmp.getEncoded(), "AES");
+
+        Cipher cipher = Cipher.getInstance("AES");
+        cipher.init(Cipher.ENCRYPT_MODE, secret);
+
+        byte[] cipherText = cipher.doFinal(plaintext.getBytes("UTF-8"));
+        return new String(Base64.encode(cipherText, 0));
     }
 
     private static String decrypt(String password, byte[] salt, String encrypted) throws Exception {
@@ -194,37 +210,76 @@ public class NfcMgr
         }
 
         try {
-            PasswdSafeUtil.dbginfo(TAG, "Not a yubikey");
-            Parcelable[] rawMsgs = intent.getParcelableArrayExtra(
-                    NfcAdapter.EXTRA_NDEF_MESSAGES);
-            NdefMessage msg;
-            if (rawMsgs != null && rawMsgs.length > 0) {
-                msg = (NdefMessage)rawMsgs[0];
+            String pwstr = null;
+            if(intent.getBooleanExtra("writeTag", false)){
 
-                NdefRecord[] contentRecs = msg.getRecords();
-                for (NdefRecord rec : contentRecs) {
-                    String id = new String(rec.getId(), "UTF-8");
-                    if (id.equals("passwdsafe")) {
-                        String encryptedPass = new String(
-                                rec.getPayload(), "UTF-8");
-                        SharedPreferences sharedPref = itsUser
-                                .getActivity().getPreferences(
-                                        Context.MODE_PRIVATE);
+                pwstr = intent.getExtras().getString("pwsafePass");
+                String encryptionPass = UUID.randomUUID().toString();
+                String encryptedPwsafePass = encrypt(encryptionPass, tag.getId(), pwstr);
+                String encryptedEncryptionPass = encrypt(encryptedPwsafePass, tag.getId(),
+                        encryptionPass);
 
-                        String encryptedEncryptionPass = sharedPref
-                                .getString("encryptionkey", "");
-                        String encryptionPass = decrypt(
-                                encryptedPass, tag.getId(),
-                                encryptedEncryptionPass);
-                        String pwstr = decrypt(
-                                encryptionPass, tag.getId(),
-                                encryptedPass);
+                short TNF_MIME_MEDIA = 2;
+                NdefRecord[] records = { new NdefRecord(TNF_MIME_MEDIA,
+                        "application/nfckey".getBytes(),
+                        "passwdsafe".getBytes(),
+                        encryptedPwsafePass.getBytes()) };
 
-                        stopUser(pwstr, null);
-                        break;
+                NdefMessage message = new NdefMessage(records);
+                Ndef ndef = Ndef.get(tag);
+
+                if(ndef != null) {
+                    ndef.connect();
+                    ndef.writeNdefMessage(message);
+                    ndef.close();
+                }
+                else{
+                    NdefFormatable formatable = NdefFormatable.get(tag);
+                    if (formatable != null) {
+                        formatable.connect();
+                        formatable.format(message);
+                        formatable.close();
+                    }
+                }
+                //Log.i("passwdsafe", "Written to tag successfully");
+                SharedPreferences sharedPref = itsUser.getActivity().getPreferences(
+                        Context.MODE_PRIVATE);
+                SharedPreferences.Editor editor = sharedPref.edit();
+                editor.putString("encryptionkey", encryptedEncryptionPass);
+                editor.commit();
+            }
+            else{
+                Parcelable[] rawMsgs = intent.getParcelableArrayExtra(
+                        NfcAdapter.EXTRA_NDEF_MESSAGES);
+                NdefMessage msg;
+                if (rawMsgs != null && rawMsgs.length > 0) {
+                    msg = (NdefMessage) rawMsgs[0];
+
+                    NdefRecord[] contentRecs = msg.getRecords();
+                    for (NdefRecord rec : contentRecs) {
+                        String id = new String(rec.getId(), "UTF-8");
+                        if (id.equals("passwdsafe")) {
+                            String encryptedPass = new String(
+                                    rec.getPayload(), "UTF-8");
+                            SharedPreferences sharedPref = itsUser
+                                    .getActivity().getPreferences(
+                                            Context.MODE_PRIVATE);
+
+                            String encryptedEncryptionPass = sharedPref
+                                    .getString("encryptionkey", "");
+                            String encryptionPass = decrypt(
+                                    encryptedPass, tag.getId(),
+                                    encryptedEncryptionPass);
+                            pwstr = decrypt(
+                                    encryptionPass, tag.getId(),
+                                    encryptedPass);
+
+                            break;
+                        }
                     }
                 }
             }
+            stopUser(pwstr, null);
         }catch(Exception e){
             PasswdSafeUtil.dbginfo(TAG, e, "handleKeyIntent");
             stopUser(null, e);

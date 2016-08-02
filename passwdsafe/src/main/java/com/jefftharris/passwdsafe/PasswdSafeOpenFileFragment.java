@@ -314,6 +314,11 @@ public class PasswdSafeOpenFileFragment
     public void onNewIntent(Intent intent)
     {
         if (itsNfcTagCb.isChecked() && itsNfcMgr != null) {
+            if(itsSavePasswdCb.isChecked()){
+                intent.putExtra("writeTag", true);
+                intent.putExtra("pwsafePass", itsPasswordEdit.getText().toString());
+            }
+
             itsNfcMgr.handleKeyIntent(intent);
         }
         else if (itsYubikeyCb.isChecked() && itsYubiMgr != null) {
@@ -424,7 +429,7 @@ public class PasswdSafeOpenFileFragment
                 itsNfcTagCb.setChecked(false);
         }
         case R.id.save_password: {
-            if (itsSavePasswdCb.isChecked()) {
+            if (itsSavePasswdCb.isChecked() && !itsNfcTagCb.isChecked()) {
                 Context ctx = getContext();
                 SharedPreferences prefs = Preferences.getSharedPrefs(ctx);
                 if (!Preferences.isFileSavedPasswordConfirm(prefs)) {
@@ -704,12 +709,15 @@ public class PasswdSafeOpenFileFragment
 
         boolean isSaved = itsSavedPasswordsMgr.isSaved(getFileUri());
         boolean doSave = itsSavePasswdCb.isChecked();
-        if (isSaved && !doSave) {
-            itsSaveChange = SavePasswordChange.REMOVE;
-        } else if (!isSaved && doSave) {
-            itsSaveChange = SavePasswordChange.ADD;
-        } else {
-            itsSaveChange = SavePasswordChange.NONE;
+
+        if(!itsNfcTagCb.isChecked()) {
+            if (isSaved && !doSave) {
+                itsSaveChange = SavePasswordChange.REMOVE;
+            } else if (!isSaved && doSave) {
+                itsSaveChange = SavePasswordChange.ADD;
+            } else {
+                itsSaveChange = SavePasswordChange.NONE;
+            }
         }
 
         Owner<PwsPassword> passwd =
